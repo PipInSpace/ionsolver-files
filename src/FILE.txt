@@ -1,0 +1,15 @@
+Little Endian
+#Info
+l,w,h : 3 * 4 Byte (3 * uint)
+meter/unit : 4 Byte (float)
+kilogram/unit : 4 Byte (float)
+second/timestep : 4 Byte (float)
+coulomb/unit : 4 Byte (float)
+
+#Walls
+len : 4 Byte
+[pos1, pos2] 2 * 8 Byte * len (2 * ulong)
+
+#Charge
+len : 4 Byte
+[charge, pos] (4 Byte + 8 Byte) * len (float + ulong)
