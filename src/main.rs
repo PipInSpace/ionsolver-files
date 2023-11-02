@@ -54,5 +54,3 @@ fn push64(buffer: &mut Vec<u8>, x: u64) {
         buffer.push((((x >> i*8) &0xFF)).try_into().unwrap());
     }
 }
-
-// Format: Little-Endian 4-Byte chunk representing f32 + 8-Byte Chunk representing u64
