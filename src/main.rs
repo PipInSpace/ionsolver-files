@@ -1,16 +1,12 @@
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, time::Instant};
+mod pusher;
 
-struct Charge {
-    coulomb: f32,
-    i: u64,
-}
-
-struct Wall {
-    solid: bool,
-}
+use pusher::*;
 
 fn main() {
-    println!("Writing");
+    println!("Creating Buffers");
+    let now = Instant::now();
+
     let mut vcharge: Vec<Charge> = vec![];
     let mut vwalls: Vec<Wall> = vec![];
     let mut buffer: Vec<u8> = vec![];
@@ -54,51 +50,19 @@ fn main() {
         push32(&mut buffer, charge.coulomb.to_bits());
         push64(&mut buffer, charge.i);
     }
+
+    print!("Done. ");
+    let time = now.elapsed().as_millis();
+    println!("Took {:?} seconds", time as f32 / 1000f32);
+
+    println!("Writing");
+    let now2 = Instant::now();
+    
     // Write buffer to file
     let mut file = File::create("generated.ion").unwrap();
     file.write_all(&buffer).unwrap();
-}
 
-// Push different byte sizes to 8-Bit Buffer
-fn push32(buffer: &mut Vec<u8>, x: u32) {
-    for i in 0..4 {
-        buffer.push((((x >> i*8) &0xFF)).try_into().unwrap());
-    }
-}
-
-fn push64(buffer: &mut Vec<u8>, x: u64) {
-    for i in 0..8 {
-        buffer.push((((x >> i*8) &0xFF)).try_into().unwrap());
-    }
-}
-
-fn pushwalls(buffer: &mut Vec<u8>, x: &[Wall]) {
-    // Pushes a slice of walls into one byte
-    // smallest index in most significant bit.
-    // If index not divisible by 8, last element contains 0s for non-existant indecies
-    let mut byte: u8 = 0;
-    for i in 0..x.len() {
-        byte += (x[i].solid as u8) << 7-i;
-    }
-    buffer.push(byte)
-}
-
-fn pushname(buffer: &mut Vec<u8>) {
-    // Pushes the human-readable fileheader
-    buffer.push('I' as u8);
-    buffer.push('o' as u8);
-    buffer.push('n' as u8);
-    buffer.push('S' as u8);
-    buffer.push('o' as u8);
-    buffer.push('l' as u8);
-    buffer.push('v' as u8);
-    buffer.push('e' as u8);
-    buffer.push('r' as u8);
-    buffer.push(' ' as u8);
-    buffer.push('s' as u8);
-    buffer.push('e' as u8);
-    buffer.push('t' as u8);
-    buffer.push('u' as u8);
-    buffer.push('p' as u8);
-    buffer.push('\n' as u8);
+    print!("Done. ");
+    let time2 = now2.elapsed().as_millis();
+    println!("Took {:?} seconds", time2 as f32 / 1000f32);
 }
