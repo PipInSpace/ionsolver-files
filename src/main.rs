@@ -42,9 +42,11 @@ fn main() {
     push32(&mut buffer, coulomb_c.to_bits());
 
     // Write all Walls
-    for charge in vwalls.chunks(8) {
-        pushwalls(&mut buffer, charge)
+    for wall in vwalls.chunks(8) {
+        pushwalls(&mut buffer, wall)
     }
+
+    push32(&mut buffer, vcharge.len() as u32);
     // Write all charges
     for charge in vcharge {
         push32(&mut buffer, charge.coulomb.to_bits());
@@ -57,7 +59,7 @@ fn main() {
 
     println!("Writing");
     let now2 = Instant::now();
-    
+
     // Write buffer to file
     let mut file = File::create("generated.ion").unwrap();
     file.write_all(&buffer).unwrap();
