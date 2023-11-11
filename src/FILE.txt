@@ -1,4 +1,6 @@
 Little Endian
+#Header
+"IonSolver setup" 15 Byte + 1 unused
 #Info
 l,w,h : 3 * 4 Byte (3 * uint)
 meter/unit : 4 Byte (float)
