@@ -1,4 +1,4 @@
-use std::{fs::File, io::{Write}, time::Instant};
+use std::{fs::File, io::Write, time::Instant};
 mod pusher;
 mod simvalues;
 
@@ -90,10 +90,10 @@ fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, co
     print!("Done. ");
     println!("Took {:?} seconds", time as f32 / 1000f32);
 
-    return buffer;
+    buffer
 }
 
-fn decode(buffer: &Vec<u8>) -> Result<SimValues, String> {
+fn decode(buffer: &[u8]) -> Result<SimValues, String> {
     println!("Decoding Buffers");
     let now = Instant::now();
 
@@ -110,36 +110,35 @@ fn decode(buffer: &Vec<u8>) -> Result<SimValues, String> {
     pos += 1; // increment to skip next byte so we are 4 byte aligned again
 
     // Values
-    let l = to_u32(get_next_chunk(&buffer, &mut pos));
-    let w = to_u32(get_next_chunk(&buffer, &mut pos));
-    let h = to_u32(get_next_chunk(&buffer, &mut pos));
+    let l = to_u32(get_next_chunk(buffer, &mut pos));
+    let w = to_u32(get_next_chunk(buffer, &mut pos));
+    let h = to_u32(get_next_chunk(buffer, &mut pos));
     
-    let m = to_f32(get_next_chunk(&buffer, &mut pos));
-    let kg = to_f32(get_next_chunk(&buffer, &mut pos));
-    let s = to_f32(get_next_chunk(&buffer, &mut pos));
-    let c = to_f32(get_next_chunk(&buffer, &mut pos));
+    let m = to_f32(get_next_chunk(buffer, &mut pos));
+    let kg = to_f32(get_next_chunk(buffer, &mut pos));
+    let s = to_f32(get_next_chunk(buffer, &mut pos));
+    let c = to_f32(get_next_chunk(buffer, &mut pos));
 
     // Walls
     let mut walls: Vec<bool> = vec![];
     for _ in 0..(l*w*h/(4 * 8)) {
-        let chunk = get_next_chunk(&buffer, &mut pos);
-        for j in 0..4 {
-            let b = chunk[j];
+        let chunk = get_next_chunk(buffer, &mut pos);
+        for byte in chunk {
             for bit in 0..8 {
-                walls.push((b >> 7-bit) & (1 as u8) == 1);
+                walls.push((byte >> (7-bit)) & 1_u8 == 1);
             }
         }
     }
 
     // Charges
-    let len = to_u32(get_next_chunk(&buffer, &mut pos));
+    let len = to_u32(get_next_chunk(buffer, &mut pos));
     //println!("Len: {}", len);
 
     let mut charges: Vec<Charge> = vec![];
     for _ in 0..len {
-        let charge = to_f32(get_next_chunk(&buffer, &mut pos));
-        let i1 = get_next_chunk(&buffer, &mut pos);
-        let i2 = get_next_chunk(&buffer, &mut pos);
+        let charge = to_f32(get_next_chunk(buffer, &mut pos));
+        let i1 = get_next_chunk(buffer, &mut pos);
+        let i2 = get_next_chunk(buffer, &mut pos);
         charges.push(Charge {
             coulomb: charge,
             i: to_u64(i1, i2),
@@ -147,25 +146,25 @@ fn decode(buffer: &Vec<u8>) -> Result<SimValues, String> {
     }
 
     let values = SimValues {
-        l: l,
-        w: w,
-        h: h,
-        m: m,
-        kg: kg,
-        s: s,
-        c: c,
-        walls: walls,
-        charges: charges,
+        l,
+        w,
+        h,
+        m,
+        kg,
+        s,
+        c,
+        walls,
+        charges,
     };
 
     let time = now.elapsed().as_millis();
     print!("Done. ");
     println!("Took {:?} seconds", time as f32 / 1000f32);
 
-    return Ok(values);
+    Ok(values)
 }
 
-fn get_next_chunk(buffer: &Vec<u8>, pos: &mut usize) -> [u8; 4] {
+fn get_next_chunk(buffer: &[u8], pos: &mut usize) -> [u8; 4] {
     let mut v =  [0; 4];
     v[0] = buffer[*pos];
     v[1] = buffer[*pos + 1];
@@ -173,21 +172,21 @@ fn get_next_chunk(buffer: &Vec<u8>, pos: &mut usize) -> [u8; 4] {
     v[3] = buffer[*pos + 3];
     *pos += 4;
 
-    return v;
+    v
 }
 
 fn to_u32(v: [u8; 4]) -> u32 {
-    return v[0] as u32 + ((v[1] as u32) << 8) + ((v[2] as u32) << 16) + ((v[3] as u32) << 24);
+    v[0] as u32 + ((v[1] as u32) << 8) + ((v[2] as u32) << 16) + ((v[3] as u32) << 24)
 }
 
 fn to_u64(vlow: [u8; 4], vhigh: [u8; 4]) -> u64 {
     //println!("u64: {}", to_u32(vlow) as u64 + ((to_u32(vhigh) as u64) << 32));
-    return to_u32(vlow) as u64 + ((to_u32(vhigh) as u64) << 32);
+    to_u32(vlow) as u64 + ((to_u32(vhigh) as u64) << 32)
 }
 
 fn to_f32(v: [u8; 4]) -> f32 {
     //return f32::from_le_bytes([0, 0, 0x80, 0x3f]); // 1.0
     //println!("f32: {} {} {} {}", v[0], v[1], v[2], v[3]);
     //println!("f32: {}", f32::from_le_bytes(v));
-    return f32::from_le_bytes(v);
+    f32::from_le_bytes(v)
 }
