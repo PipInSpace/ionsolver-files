@@ -1,30 +1,60 @@
-use std::{fs::File, io::Write};
+use std::{fs::File, io::{Write}, time::Instant};
+mod pusher;
+mod simvalues;
 
-struct Charge {
-    coulomb: f32,
-    i: u64,
-}
-
-#[derive(Clone)]
-struct Wall {
-    solid: bool,
-}
+use pusher::*;
+use simvalues::SimValues;
 
 fn main() {
-    println!("Setup");
+
+    let buffer = encode(512, 512, 512, 1.0, 1.0, 1.0, 1.0);
+    let values = decode(&buffer).unwrap();
+
+    println!("L: {}", values.l);
+    println!("W: {}", values.w);
+    println!("H: {}", values.h);
+    println!("M: {}", values.m);
+    println!("Kg: {}", values.kg);
+    println!("S: {}", values.s);
+    println!("C: {}", values.c);
+
+    let mut all_true = true; 
+    for b in values.walls {
+        if !b {
+            all_true = false;
+        }
+    }
+    println!("Walls: {}", all_true);
+
+    println!("Writing");
+    let now2 = Instant::now();
+
+    // Write buffer to file
+    let mut file = File::create("generated.ion").unwrap();
+    file.write_all(&buffer).unwrap();
+
+    print!("Done. ");
+    let time2 = now2.elapsed().as_millis();
+    println!("Took {:?} seconds", time2 as f32 / 1000f32);
+}
+
+fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, coulomb: f32, /* charges: Vec<Charge>, Walls */) -> Vec<u8> {
+    println!("Creating Buffers");
+    let now = Instant::now();
+
     let mut vcharge: Vec<Charge> = vec![];
     let mut buffer: Vec<u8> = vec![];
     
     // Lenght, Width, Height (x, y, z)
-    let l: u32 = 512;
-    let w: u32 = 512;
-    let h: u32 = 512;
+    //let l: u32 = 512;
+    //let w: u32 = 512;
+    //let h: u32 = 512;
     let n: u32 = l*w*h;
     // Conversion factors
-    let meter_c: f32 = 1.0;
-    let kilogram_c: f32 = 1.0;
-    let second_c: f32 = 1.0;
-    let coulomb_c: f32 = 1.0;
+    //let meter_c: f32 = 1.0;
+    //let kilogram_c: f32 = 1.0;
+    //let second_c: f32 = 1.0;
+    //let coulomb_c: f32 = 1.0;
     // Fill Vectors
     let vwalls: Vec<Wall> = vec![Wall {solid: true}; n as usize];
     for i in 0..100 {
@@ -39,65 +69,125 @@ fn main() {
     push32(&mut buffer, l);
     push32(&mut buffer, w);
     push32(&mut buffer, h);
-    push32(&mut buffer, meter_c.to_bits());
-    push32(&mut buffer, kilogram_c.to_bits());
-    push32(&mut buffer, second_c.to_bits());
-    push32(&mut buffer, coulomb_c.to_bits());
+    push32(&mut buffer, meter.to_bits());
+    push32(&mut buffer, kilogram.to_bits());
+    push32(&mut buffer, second.to_bits());
+    push32(&mut buffer, coulomb.to_bits());
 
     // Write all Walls
-    for charge in vwalls.chunks(8) {
-        pushwalls(&mut buffer, charge)
+    for wall in vwalls.chunks(8) {
+        pushwalls(&mut buffer, wall)
     }
+
+    push32(&mut buffer, vcharge.len() as u32);
     // Write all charges
     for charge in vcharge {
         push32(&mut buffer, charge.coulomb.to_bits());
         push64(&mut buffer, charge.i);
     }
-    // Write buffer to file
-    let mut file = File::create("generated.ion").unwrap();
-    file.write_all(&buffer).unwrap();
+
+    let time = now.elapsed().as_millis();
+    print!("Done. ");
+    println!("Took {:?} seconds", time as f32 / 1000f32);
+
+    return buffer;
 }
 
-// Push different byte sizes to 8-Bit Buffer
-fn push32(buffer: &mut Vec<u8>, x: u32) {
-    for i in 0..4 {
-        buffer.push(((x >> (i*8)) &0xFF).try_into().unwrap());
+fn decode(buffer: &Vec<u8>) -> Result<SimValues, String> {
+    println!("Decoding Buffers");
+    let now = Instant::now();
+
+    let mut pos: usize = 0;
+    let mut header = "".to_owned();
+    for _ in 0..15 {
+        header.push(buffer[pos] as char);
+        pos += 1;
     }
-}
-
-fn push64(buffer: &mut Vec<u8>, x: u64) {
-    for i in 0..8 {
-        buffer.push(((x >> (i*8)) &0xFF).try_into().unwrap());
+    if header != "IonSolver setup" {
+        return Err("Invalid format!".to_owned());
     }
-}
 
-fn pushwalls(buffer: &mut Vec<u8>, x: &[Wall]) {
-    // Pushes a slice of walls into one byte
-    // smallest index in most significant bit.
-    // If index not divisible by 8, last element contains 0s for non-existant indecies
-    let mut byte: u8 = 0;
-    for (i, wall) in x.iter().enumerate() {
-        byte += (wall.solid as u8) << (7-i);
+    pos += 1; // increment to skip next byte so we are 4 byte aligned again
+
+    // Values
+    let l = to_u32(get_next_chunk(&buffer, &mut pos));
+    let w = to_u32(get_next_chunk(&buffer, &mut pos));
+    let h = to_u32(get_next_chunk(&buffer, &mut pos));
+    
+    let m = to_f32(get_next_chunk(&buffer, &mut pos));
+    let kg = to_f32(get_next_chunk(&buffer, &mut pos));
+    let s = to_f32(get_next_chunk(&buffer, &mut pos));
+    let c = to_f32(get_next_chunk(&buffer, &mut pos));
+
+    // Walls
+    let mut walls: Vec<bool> = vec![];
+    for _ in 0..(l*w*h/(4 * 8)) {
+        let chunk = get_next_chunk(&buffer, &mut pos);
+        for j in 0..4 {
+            let b = chunk[j];
+            for bit in 0..8 {
+                walls.push((b >> 7-bit) & (1 as u8) == 1);
+            }
+        }
     }
-    buffer.push(byte)
+
+    // Charges
+    let len = to_u32(get_next_chunk(&buffer, &mut pos));
+    //println!("Len: {}", len);
+
+    let mut charges: Vec<Charge> = vec![];
+    for _ in 0..len {
+        let charge = to_f32(get_next_chunk(&buffer, &mut pos));
+        let i1 = get_next_chunk(&buffer, &mut pos);
+        let i2 = get_next_chunk(&buffer, &mut pos);
+        charges.push(Charge {
+            coulomb: charge,
+            i: to_u64(i1, i2),
+        })
+    }
+
+    let values = SimValues {
+        l: l,
+        w: w,
+        h: h,
+        m: m,
+        kg: kg,
+        s: s,
+        c: c,
+        walls: walls,
+        charges: charges,
+    };
+
+    let time = now.elapsed().as_millis();
+    print!("Done. ");
+    println!("Took {:?} seconds", time as f32 / 1000f32);
+
+    return Ok(values);
 }
 
-fn pushname(buffer: &mut Vec<u8>) {
-    // Pushes the human-readable fileheader
-    buffer.push(b'I');
-    buffer.push(b'o');
-    buffer.push(b'n');
-    buffer.push(b'S');
-    buffer.push(b'o');
-    buffer.push(b'l');
-    buffer.push(b'v');
-    buffer.push(b'e');
-    buffer.push(b'r');
-    buffer.push(b' ');
-    buffer.push(b's');
-    buffer.push(b'e');
-    buffer.push(b't');
-    buffer.push(b'u');
-    buffer.push(b'p');
-    buffer.push(b'\n');
+fn get_next_chunk(buffer: &Vec<u8>, pos: &mut usize) -> [u8; 4] {
+    let mut v =  [0; 4];
+    v[0] = buffer[*pos];
+    v[1] = buffer[*pos + 1];
+    v[2] = buffer[*pos + 2];
+    v[3] = buffer[*pos + 3];
+    *pos += 4;
+
+    return v;
+}
+
+fn to_u32(v: [u8; 4]) -> u32 {
+    return v[0] as u32 + ((v[1] as u32) << 8) + ((v[2] as u32) << 16) + ((v[3] as u32) << 24);
+}
+
+fn to_u64(vlow: [u8; 4], vhigh: [u8; 4]) -> u64 {
+    //println!("u64: {}", to_u32(vlow) as u64 + ((to_u32(vhigh) as u64) << 32));
+    return to_u32(vlow) as u64 + ((to_u32(vhigh) as u64) << 32);
+}
+
+fn to_f32(v: [u8; 4]) -> f32 {
+    //return f32::from_le_bytes([0, 0, 0x80, 0x3f]); // 1.0
+    //println!("f32: {} {} {} {}", v[0], v[1], v[2], v[3]);
+    //println!("f32: {}", f32::from_le_bytes(v));
+    return f32::from_le_bytes(v);
 }

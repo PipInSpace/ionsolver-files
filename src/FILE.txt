@@ -1,4 +1,6 @@
 Little Endian
+#Header
+"IonSolver setup" 15 Byte + 1 unused
 #Info
 l,w,h : 3 * 4 Byte (3 * uint)
 meter/unit : 4 Byte (float)
@@ -7,9 +9,10 @@ second/timestep : 4 Byte (float)
 coulomb/unit : 4 Byte (float)
 
 #Walls
-Chunk len : 1 Byte
+#Chunk len : 1 Byte
 For every index n (8 indecies in one byte): 1 for solid/wall, 0 for empty
 
 #Charge
-Chunk len : 4 Byte
+#Chunk len : 4 Byte
+len : 4 Byte
 [charge, pos] (4 Byte + 8 Byte) * len (float + ulong)
