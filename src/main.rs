@@ -64,26 +64,26 @@ fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, co
 
     // Write to buffer
     println!("Writing...");
-    pushname(&mut buffer);
+    buffer.pushname();
     // Write lenth, width, height
-    push32(&mut buffer, l);
-    push32(&mut buffer, w);
-    push32(&mut buffer, h);
-    push32(&mut buffer, meter.to_bits());
-    push32(&mut buffer, kilogram.to_bits());
-    push32(&mut buffer, second.to_bits());
-    push32(&mut buffer, coulomb.to_bits());
+    buffer.push32(l);
+    buffer.push32(w);
+    buffer.push32(h);
+    buffer.push32(meter.to_bits());
+    buffer.push32(kilogram.to_bits());
+    buffer.push32(second.to_bits());
+    buffer.push32(coulomb.to_bits());
 
     // Write all Walls
-    for wall in vwalls.chunks(8) {
-        pushwalls(&mut buffer, wall)
+    for wall_chunk in vwalls.chunks(8) {
+        buffer.pushwalls(wall_chunk);
     }
 
-    push32(&mut buffer, vcharge.len() as u32);
+    buffer.push32(vcharge.len() as u32);
     // Write all charges
     for charge in vcharge {
-        push32(&mut buffer, charge.coulomb.to_bits());
-        push64(&mut buffer, charge.i);
+        buffer.push32(charge.coulomb.to_bits());
+        buffer.push64(charge.i);
     }
 
     let time = now.elapsed().as_millis();

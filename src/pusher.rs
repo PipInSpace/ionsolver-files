@@ -9,48 +9,54 @@ pub struct Wall {
     pub solid: bool,
 }
 
+/// Push different byte sizes to 8-Bit Buffer
+pub trait ByteBuffer {
+    fn push32(&mut self, x: u32);
+    fn push64(&mut self, x: u64);
+    fn pushwalls(&mut self, x: &[Wall]);
+    fn pushname(&mut self);
+}
 
-// Push different byte sizes to 8-Bit Buffer
-
-pub fn push32(buffer: &mut Vec<u8>, x: u32) {
-    for i in 0..4 {
-        buffer.push(((x >> (i*8)) &0xFF).try_into().unwrap());
+impl ByteBuffer for Vec<u8> {
+    /// Pushes the human-readable fileheader
+    fn pushname(&mut self) {
+        self.push(b'I');
+        self.push(b'o');
+        self.push(b'n');
+        self.push(b'S');
+        self.push(b'o');
+        self.push(b'l');
+        self.push(b'v');
+        self.push(b'e');
+        self.push(b'r');
+        self.push(b' ');
+        self.push(b's');
+        self.push(b'e');
+        self.push(b't');
+        self.push(b'u');
+        self.push(b'p');
+        self.push(b'\n');
+    }
+    fn push32(&mut self, x: u32) {
+        for i in 0..4 {
+            self.push(((x >> (i*8)) &0xFF).try_into().unwrap());
+        }
+    }
+    fn push64(&mut self, x: u64) {
+        for i in 0..8 {
+            self.push(((x >> (i*8)) &0xFF).try_into().unwrap());
+        }
+    }
+    fn pushwalls(&mut self, walls: &[Wall]) {
+        // Pushes a slice of walls into one byte
+        // smallest index in most significant bit.
+        // If index not divisible by 8, last element contains 0s for non-existant indecies
+        let mut byte: u8 = 0;
+        for (i, wall) in walls.iter().enumerate() {
+            byte += (wall.solid as u8) << (7-i);
+        }
+        self.push(byte)
     }
 }
 
-pub fn push64(buffer: &mut Vec<u8>, x: u64) {
-    for i in 0..8 {
-        buffer.push(((x >> (i*8)) &0xFF).try_into().unwrap());
-    }
-}
 
-pub fn pushwalls(buffer: &mut Vec<u8>, walls: &[Wall]) {
-    // Pushes a slice of walls into one byte
-    // smallest index in most significant bit.
-    // If index not divisible by 8, last element contains 0s for non-existant indecies
-    let mut byte: u8 = 0;
-    for (i, wall) in walls.iter().enumerate() {
-        byte += (wall.solid as u8) << (7-i);
-    }
-    buffer.push(byte)
-}
-
-pub fn pushname(buffer: &mut Vec<u8>) {
-    // Pushes the human-readable fileheader
-    buffer.push(b'I');
-    buffer.push(b'o');
-    buffer.push(b'n');
-    buffer.push(b'S');
-    buffer.push(b'o');
-    buffer.push(b'l');
-    buffer.push(b'v');
-    buffer.push(b'e');
-    buffer.push(b'r');
-    buffer.push(b' ');
-    buffer.push(b's');
-    buffer.push(b'e');
-    buffer.push(b't');
-    buffer.push(b'u');
-    buffer.push(b'p');
-    buffer.push(b'\n');
-}
