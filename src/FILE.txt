@@ -16,3 +16,8 @@ For every index n (8 indecies in one byte): 1 for solid/wall, 0 for empty
 #Chunk len : 4 Byte
 len : 4 Byte
 [charge, pos] (4 Byte + 8 Byte) * len (float + ulong)
+
+#Magnets
+#Chunk len : 4 Byte
+Entry len : 20 Byte (u64, f32, f32, f32)
+[pos, magnetisation[f32; 3] ] (8 Byte + 4 Byte + 4 Byte + 4 Byte) = 20 Byte
