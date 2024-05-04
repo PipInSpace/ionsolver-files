@@ -7,24 +7,16 @@ use simvalues::SimValues;
 
 fn main() {
 
-    let buffer = encode(512, 512, 512, 1.0, 1.0, 1.0, 1.0);
+    let buffer = encode(128, 128, 256, 1.0, 1.0, 1.0, 1.0);
     let values = decode(&buffer).unwrap();
 
-    println!("L: {}", values.l);
-    println!("W: {}", values.w);
-    println!("H: {}", values.h);
+    println!("L: {}", values.n_x);
+    println!("W: {}", values.n_y);
+    println!("H: {}", values.n_z);
     println!("M: {}", values.m);
     println!("Kg: {}", values.kg);
     println!("S: {}", values.s);
     println!("C: {}", values.c);
-
-    let mut all_true = true; 
-    for b in values.walls {
-        if !b {
-            all_true = false;
-        }
-    }
-    println!("Walls: {}", all_true);
 
     println!("Writing");
     let now2 = Instant::now();
@@ -38,27 +30,27 @@ fn main() {
     println!("Took {:?} seconds", time2 as f32 / 1000f32);
 }
 
-fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, coulomb: f32, /* charges: Vec<Charge>, Walls */) -> Vec<u8> {
+fn encode(n_x : u32, n_y : u32, n_z : u32, meter : f32, kilogram: f32, second: f32, coulomb: f32, /* charges: Vec<Charge>, Walls */) -> Vec<u8> {
     println!("Creating Buffers");
     let now = Instant::now();
 
-    let mut vcharge: Vec<Charge> = vec![];
+    let vcharge: Vec<Charge> = vec![];
     let mut buffer: Vec<u8> = vec![];
     
-    // Lenght, Width, Height (x, y, z)
-    //let l: u32 = 512;
-    //let w: u32 = 512;
-    //let h: u32 = 512;
-    let n: u32 = l*w*h;
-    // Conversion factors
-    //let meter_c: f32 = 1.0;
-    //let kilogram_c: f32 = 1.0;
-    //let second_c: f32 = 1.0;
-    //let coulomb_c: f32 = 1.0;
+    let n: u32 = n_x*n_y*n_z;
     // Fill Vectors
-    let vwalls: Vec<Wall> = vec![Wall {solid: true}; n as usize];
-    for i in 0..100 {
-        vcharge.push(Charge { coulomb: 1.0*i as f32, i: i as u64 });
+    let mut vwalls: Vec<Wall> = vec![Wall {solid: false}; n as usize];
+    for i in 0..(n_x*n_y*8) {
+        vwalls[i as usize] = Wall {solid: true};
+        vwalls[(n - 1 - i) as usize] = Wall {solid: true};
+    }
+    //for i in 0..100 {
+    //    vcharge.push(Charge { coulomb: 1.0*i as f32, i: i as u64 });
+    //}
+    let mut vmagnet: Vec<(u64, [f32; 3])> = vec![];
+    for i in 0..243 {
+        vmagnet.push((i * 68, [0.0, 0.0, 64000000000.0]));
+        vmagnet.push((i * 68 + 2097152 * 2, [0.0, 0.0, 64000000000.0]));
     }
     
 
@@ -66,9 +58,9 @@ fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, co
     println!("Writing...");
     buffer.pushname();
     // Write lenth, width, height
-    buffer.push32(l);
-    buffer.push32(w);
-    buffer.push32(h);
+    buffer.push32(n_x);
+    buffer.push32(n_y);
+    buffer.push32(n_z);
     buffer.push32(meter.to_bits());
     buffer.push32(kilogram.to_bits());
     buffer.push32(second.to_bits());
@@ -84,6 +76,14 @@ fn encode(l : u32, w : u32, h : u32, meter : f32, kilogram: f32, second: f32, co
     for charge in vcharge {
         buffer.push32(charge.coulomb.to_bits());
         buffer.push64(charge.i);
+    }
+    buffer.push32(vmagnet.len() as u32);
+    // Write all magnets
+    for magnet in vmagnet {
+        buffer.push64(magnet.0);
+        buffer.push32(magnet.1[0].to_bits());
+        buffer.push32(magnet.1[1].to_bits());
+        buffer.push32(magnet.1[2].to_bits());
     }
 
     let time = now.elapsed().as_millis();
@@ -146,9 +146,9 @@ fn decode(buffer: &[u8]) -> Result<SimValues, String> {
     }
 
     let values = SimValues {
-        l,
-        w,
-        h,
+        n_x: l,
+        n_y: w,
+        n_z: h,
         m,
         kg,
         s,
